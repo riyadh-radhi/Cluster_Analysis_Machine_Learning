@@ -1,0 +1,141 @@
+---
+title: "RiyadhRadhi_clusterAnalysisHW_report"
+author: "Riyadh Radhi"
+date: "April 20, 2019"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#This Report will conduct two types of Cluster Anaslysis ( Hierarchical Clusters + Kmeans Cluster)
+
+### Step 0 : Loading required libraries and setting working diretory 
+
+```{r, warning=FALSE,message=FALSE}
+library(dplyr)
+library(ggplot2)
+
+rm(list = ls())
+```
+
+
+### Step 1: Loading our data and filtering based on region and selecting our required columns 
+
+```{r}
+countries_df<-read.csv("Countries.csv")
+
+europe_df<-countries_df %>%
+  filter(Region == "Europe") %>%
+  select(Country.Name,Abbr,Business.Freedom,Labor.Freedom,Monetary.Freedom,Trade.Freedom,Investment.Freedom,Financial.Freedom)
+
+head(europe_df)
+```
+
+
+### Step 2: Standardize our dataframe with Z scores 
+
+```{r}
+standarized_europe_df <-data.frame(scale(europe_df[,3:ncol(europe_df)],center = TRUE,scale = TRUE))
+
+head(standarized_europe_df)
+```
+
+
+### Step 3: Finding the distances between countries using **euclidian distance**
+
+```{r}
+distance_europe<- dist(standarized_europe_df, method = "euclidian")
+```
+
+
+### Step 4: Running hierarchical cluster analysis with **complete distance** + Constructing  a dendrogram + drawing rectangles around the clusters 
+
+
+```{r}
+
+clustered_europe<- hclust(distance_europe, method = "complete")
+clustered_europe
+```
+
+
+```{r}
+
+plot(clustered_europe,hang=1)
+rect.hclust(clustered_europe,2, border = "blue")
+```
+
+After looking at the plot, I chose ** k=2 ** to be our clusters. I think it is the optimal value.
+
+
+
+### Step 5: Adding New membership variable to our original europe dataframe 
+
+```{r}
+europe_df$cluster_membership <- cutree(clustered_europe, 2)
+head(europe_df)
+```
+
+
+### Step 6:  Perfomring Kmeans clustering with 2 clusters + adding new membership variable  
+
+```{r}
+kmeans_europe_cluster <-  kmeans(distance_europe,2)
+kmeans_europe_cluster
+```
+
+```{r}
+europe_df$kmeans_cluster_membership <- kmeans_europe_cluster$cluster
+head(europe_df)
+```
+
+
+
+### Step 7: Compare the two clusterings by creating three different tables 
+
+```{r}
+table(europe_df$cluster_membership)
+```
+```{r}
+table(europe_df$kmeans_cluster_membership)
+```
+```{r}
+table(hierarchical=europe_df$cluster_membership,Kmeans=europe_df$kmeans_cluster_membership)
+```
+
+
+From the tables above, we can see that the hierarchical method are doing better in my opinoin, because it divided our groups in more details and found more distinct features.
+
+
+### Step 8.1:Scatter plot between Business.Freedom and Investment.Freedom
+
+```{r}
+ggplot(europe_df, aes(x= Business.Freedom,y=Investment.Freedom))+
+  geom_point(aes(col=europe_df$cluster_membership))+
+  geom_text(label=europe_df$Abbr, nudge_x = 1, nudge_y = 1)
+```
+
+
+### Step 8.2:Discuss the position of Armenia on the map
+
+For this step, I will find the position of armenia on the plot, and find the average of both axes and compare them to Armenia's position. From this I want to conclude some objective thoughts regarding Armenia's position.
+
+```{r}
+armenia_coordination <-data.frame(x_Business.Freedom= europe_df[europe_df$Abbr == "ARM","Business.Freedom"],
+                         y_Investment.Freedom=europe_df[europe_df$Abbr == "ARM","Investment.Freedom"])
+armenia_coordination
+```
+```{r}
+Business.Freedom_mean <-summary(europe_df$Business.Freedom)["Mean"]
+Investment.Freedom_mean <-summary(europe_df$Investment.Freedom)["Mean"]
+
+table_comparision<-data.frame(rbind(Business.Freedom_mean,Investment.Freedom_mean,
+      Armenia_Business.Freedom = armenia_coordination[,1],
+      Armenia_Investment.Freedom =armenia_coordination[,2] ))
+colnames(table_comparision) <- "percentage_statistics"
+
+table_comparision
+```
+
+From the table above, we can actually conclude that Armenia is in good place in terms of both Business freedom, and investment freedom, as it is above average in both cases and this is good indications.
